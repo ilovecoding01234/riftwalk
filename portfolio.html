@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Riftwalk - Portfolio Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0f18;color:#c7d5e0;font-family:'Exo 2',sans-serif;min-height:100vh}
+  .header{padding:20px 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(102,192,244,.08)}
+  .logo{font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:700;letter-spacing:3px}
+  .logo .r{color:#8a9aaa}.logo .w{color:#66c0f4}
+  .logo-sub{font-size:11px;color:#4a5c6d;margin-left:12px;font-weight:400;letter-spacing:1px}
+  .header-right{display:flex;gap:12px;align-items:center}
+  .header-btn{background:rgba(102,192,244,.08);border:1px solid rgba(102,192,244,.12);color:#66c0f4;padding:6px 16px;border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s;font-family:inherit}
+  .header-btn:hover{background:rgba(102,192,244,.15);border-color:rgba(102,192,244,.25)}
+  .header-btn.danger{color:#ef4444;border-color:rgba(239,68,68,.15);background:rgba(239,68,68,.05)}
+  .header-btn.danger:hover{background:rgba(239,68,68,.12)}
+  .container{max-width:1200px;margin:0 auto;padding:24px 32px}
+
+  /* Stats row */
+  .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+  .stat-card{background:rgba(255,255,255,.02);border:1px solid rgba(102,192,244,.06);border-radius:10px;padding:16px;text-align:center}
+  .stat-value{font-size:28px;font-weight:700;margin-bottom:2px}
+  .stat-label{font-size:10px;color:#4a5c6d;text-transform:uppercase;letter-spacing:1.5px}
+  .stat-change{font-size:11px;margin-top:4px}
+  .green{color:#4ade80}.red{color:#ef4444}.dim{color:#4a5c6d}
+
+  /* Chart */
+  .chart-section{background:rgba(255,255,255,.02);border:1px solid rgba(102,192,244,.06);border-radius:12px;padding:20px;margin-bottom:24px}
+  .chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  .chart-title{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:600;color:#fff}
+  .chart-tabs{display:flex;gap:4px}
+  .chart-tab{padding:4px 12px;border-radius:4px;font-size:11px;cursor:pointer;color:#4a5c6d;transition:all .15s;border:1px solid transparent}
+  .chart-tab.active{color:#66c0f4;background:rgba(102,192,244,.08);border-color:rgba(102,192,244,.15)}
+  .chart-tab:hover{color:#66c0f4}
+  canvas{width:100%;height:280px;display:block}
+
+  /* Search */
+  .search-section{margin-bottom:20px}
+  .search-input{width:100%;padding:10px 16px;background:rgba(255,255,255,.03);border:1px solid rgba(102,192,244,.08);border-radius:8px;color:#c7d5e0;font-size:13px;font-family:inherit;outline:none;transition:border-color .15s}
+  .search-input:focus{border-color:rgba(102,192,244,.25)}
+  .search-input::placeholder{color:#3a4a5a}
+
+  /* Items table */
+  .items-section{background:rgba(255,255,255,.02);border:1px solid rgba(102,192,244,.06);border-radius:12px;overflow:hidden}
+  .items-header{display:grid;grid-template-columns:36px 1fr 100px 60px 100px 100px 50px;padding:10px 16px;font-size:10px;color:#4a5c6d;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(102,192,244,.06);cursor:pointer}
+  .items-header span:hover{color:#66c0f4}
+  .item-row{display:grid;grid-template-columns:36px 1fr 100px 60px 100px 100px 50px;padding:6px 16px;font-size:12px;border-bottom:1px solid rgba(255,255,255,.02);transition:background .1s;cursor:pointer;align-items:center}
+  .item-row:hover{background:rgba(102,192,244,.04)}
+  .item-row:last-child{border-bottom:none}
+  .item-name{color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item-price{color:#66c0f4;font-weight:600;text-align:right}
+  .item-change{text-align:right;font-weight:500}
+  .item-qty{text-align:center;color:#6a7a8a}
+
+  /* Item detail modal */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;justify-content:center;align-items:center}
+  .modal-overlay.active{display:flex}
+  .modal{background:#0d1420;border:1px solid rgba(102,192,244,.12);border-radius:12px;padding:24px;width:600px;max-height:80vh;overflow-y:auto}
+  .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  .modal-title{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;color:#fff}
+  .modal-close{color:#4a5c6d;cursor:pointer;font-size:20px;background:none;border:none}
+  .modal-close:hover{color:#fff}
+
+  .empty-state{text-align:center;padding:60px 20px;color:#3a4a5a}
+  .empty-state h2{font-family:'Rajdhani',sans-serif;font-size:24px;color:#4a5c6d;margin-bottom:8px}
+  .empty-state p{font-size:13px;line-height:1.7}
+
+  .footer{text-align:center;padding:24px;font-size:10px;color:#2a3a4a}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div style="display:flex;align-items:baseline">
+    <div class="logo"><span class="r">RIFT</span><span class="w">WALK</span></div>
+    <span class="logo-sub">Portfolio Tracker</span>
+  </div>
+  <div class="header-right">
+    <button class="header-btn" id="watchlist-btn">📊 Investments</button>
+    <button class="header-btn" id="import-btn">📤 Import Data</button>
+    <button class="header-btn" id="export-btn">📥 Export Data</button>
+    <button class="header-btn danger" id="clear-btn">🗑 Clear History</button>
+    <input type="file" id="import-file" accept=".json" style="display:none">
+  </div>
+</div>
+
+<div class="container" id="main">
+  <div id="currency-warning" style="display:none;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#fcd34d;line-height:1.5"></div>
+  <div class="empty-state" id="empty">
+    <h2>No portfolio data yet</h2>
+    <p>Visit your Steam inventory with Riftwalk active to start tracking.<br>Scroll through your entire inventory so all items are loaded.<br>A snapshot is saved automatically once per day.</p>
+  </div>
+
+  <div id="portfolio-content" style="display:none">
+    <div style="background:rgba(102,192,244,.04);border:1px solid rgba(102,192,244,.08);border-radius:8px;padding:8px 14px;margin-bottom:16px;font-size:11px;color:#4a5c6d;display:flex;justify-content:space-between;align-items:center">
+      <span>📊 Visit your inventory daily and scroll through all pages for accurate tracking</span>
+      <span id="dismiss-tip" style="cursor:pointer;color:#3a4a5a;font-size:14px" title="Dismiss">✕</span>
+    </div>
+    <!-- Stats -->
+    <div class="stats-row" style="grid-template-columns:repeat(7,1fr)">
+      <div class="stat-card">
+        <div class="stat-value" id="s-total" style="color:#66c0f4;font-size:20px">—</div>
+        <div class="stat-label">Value</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="s-items" style="color:#fff;font-size:20px">—</div>
+        <div class="stat-label">Items</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="s-change-24h" style="font-size:16px">—</div>
+        <div class="stat-label">24h</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="s-change-7d" style="font-size:16px">—</div>
+        <div class="stat-label">7d</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="s-change-30d" style="font-size:16px">—</div>
+        <div class="stat-label">30d</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="s-change-90d" style="font-size:16px">—</div>
+        <div class="stat-label">90d</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="s-change-all" style="font-size:16px">—</div>
+        <div class="stat-label">All</div>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-section">
+      <div class="chart-header">
+        <div class="chart-title">Inventory Value</div>
+        <div class="chart-tabs">
+          <div class="chart-tab" data-range="7">7D</div>
+          <div class="chart-tab" data-range="30">30D</div>
+          <div class="chart-tab active" data-range="90">90D</div>
+          <div class="chart-tab" data-range="365">1Y</div>
+          <div class="chart-tab" data-range="0">ALL</div>
+        </div>
+      </div>
+      <canvas id="chart"></canvas>
+    </div>
+
+    <!-- Search -->
+    <div class="search-section">
+      <input type="text" class="search-input" id="search" placeholder="🔍 Search items...">
+    </div>
+
+    <!-- Items Table -->
+    <div class="items-section">
+      <div class="items-header">
+        <span></span>
+        <span data-sort="name">Item</span>
+        <span data-sort="price" style="text-align:right">Price</span>
+        <span style="text-align:center">Trend</span>
+        <span data-sort="change" style="text-align:right" id="col-change">90D Change</span>
+        <span data-sort="prev" style="text-align:right" id="col-prev">90D Start</span>
+        <span data-sort="qty" style="text-align:center">Qty</span>
+      </div>
+      <div id="items-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Item Detail Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-item-name">—</div>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div id="modal-tabs" style="display:flex;gap:4px;margin-bottom:12px">
+      <div class="chart-tab modal-tab" data-range="7">7D</div>
+      <div class="chart-tab modal-tab" data-range="30">30D</div>
+      <div class="chart-tab modal-tab active" data-range="90">90D</div>
+      <div class="chart-tab modal-tab" data-range="365">1Y</div>
+      <div class="chart-tab modal-tab" data-range="0">ALL</div>
+    </div>
+    <canvas id="modal-chart" style="width:100%;height:200px"></canvas>
+    <div id="modal-info" style="margin-top:12px;font-size:12px;color:#6a7a8a"></div>
+  </div>
+</div>
+
+<div class="footer">Riftwalk v1.4 · rftwlk.com</div>
+
+<script src="portfolio.js"></script>
+</body>
+</html>

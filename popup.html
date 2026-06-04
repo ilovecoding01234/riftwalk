@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{width:340px;background:#0f1923;color:#c7d5e0;font-family:'Segoe UI',Arial,sans-serif;font-size:13px}
+  .header{padding:12px 18px 0;display:flex;align-items:center;gap:10px}
+  .logo{font-size:16px;font-weight:700;letter-spacing:2px;color:#c7d5e0}.logo span{color:#66c0f4}
+  .ver{font-size:10px;color:#445;margin-left:auto}
+  .status-dot{width:8px;height:8px;border-radius:50%;background:#556;flex-shrink:0}
+  .status-dot.green{background:#3ecf8e;box-shadow:0 0 6px rgba(62,207,142,.4)}.status-dot.yellow{background:#e8a832}.status-dot.red{background:#e74c3c}
+
+  .tabs{display:flex;padding:10px 18px 0;gap:0;border-bottom:1px solid rgba(102,192,244,.1)}
+  .tab{flex:1;text-align:center;padding:8px 4px;font-size:11px;font-weight:600;color:#556;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;letter-spacing:.03em}
+  .tab:hover{color:#8ba3b8}.tab.active{color:#66c0f4;border-bottom-color:#66c0f4}
+
+  .tab-content{display:none;padding:14px 18px}
+  .tab-content.active{display:block}
+
+  .section-title{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#66c0f4;margin-bottom:10px;font-weight:600}
+  label{display:block;font-size:11px;color:#8ba3b8;margin-bottom:4px;margin-top:10px}
+  label:first-of-type{margin-top:0}
+  input[type="password"],input[type="text"],select{width:100%;background:#0a0e14;border:1px solid rgba(102,192,244,.15);border-radius:4px;color:#c7d5e0;padding:7px 10px;font-size:12px;outline:none;transition:border .15s}
+  input:focus,select:focus{border-color:#66c0f4}
+  select option{background:#0a0e14}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
+  .toggle-row label{margin:0;font-size:11px}
+  .toggle{position:relative;width:36px;height:20px}
+  .toggle input{opacity:0;width:0;height:0}
+  .toggle .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#1e2d3d;border-radius:10px;transition:.2s}
+  .toggle .slider:before{content:'';position:absolute;width:16px;height:16px;left:2px;bottom:2px;background:#556;border-radius:50%;transition:.2s}
+  .toggle input:checked+.slider{background:rgba(102,192,244,.3)}
+  .toggle input:checked+.slider:before{transform:translateX(16px);background:#66c0f4}
+  .btn{width:100%;background:#66c0f4;color:#0d1b2a;border:none;border-radius:4px;padding:9px;font-size:13px;font-weight:700;letter-spacing:.5px;cursor:pointer;margin-top:12px;transition:background .15s}
+  .btn:hover{background:#4fa8d8}.btn:disabled{opacity:.5;cursor:default}
+  .btn.secondary{background:transparent;border:1px solid rgba(102,192,244,.2);color:#66c0f4;margin-top:8px;font-size:11px;padding:7px}
+  .btn.secondary:hover{border-color:#66c0f4;background:rgba(102,192,244,.05)}
+  .cache-info{font-size:11px;color:#556;margin-top:8px;line-height:1.6}
+  .cache-info .val{color:#3ecf8e;font-weight:600}
+  .msg{font-size:11px;padding:6px 10px;border-radius:4px;margin-top:8px;display:none;line-height:1.4}
+  .msg.success{background:rgba(62,207,142,.1);color:#3ecf8e;border:1px solid rgba(62,207,142,.2)}
+  .msg.error{background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.2)}
+  .footer{padding:10px 18px;font-size:10px;color:#334;text-align:center;border-top:1px solid rgba(255,255,255,.04)}
+  .help{font-size:10px;color:#445;margin-top:4px;line-height:1.4}
+  .help a{color:#66c0f4;text-decoration:none}
+  .divider{height:1px;background:rgba(255,255,255,.04);margin:14px 0}
+  .feature-group{margin-top:12px;padding-top:8px;border-top:1px solid rgba(255,255,255,.04)}
+  .feature-group:first-of-type{margin-top:0;padding-top:0;border-top:none}
+  .feature-group-title{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#445;margin-bottom:6px;font-weight:600}
+  .select-row{display:flex;gap:8px;margin-top:10px}
+  .select-row .select-col{flex:1}
+  .select-row label{margin-top:0}
+  .mode-toggle{display:flex;align-items:center;gap:8px;justify-content:center;padding:6px 0}
+  .mode-label{font-size:11px;color:#445;transition:color .2s}
+  .mode-label.active{color:#66c0f4;font-weight:600}
+  .mode-switch{margin:0 4px}
+  #pe-fields.disabled,#sp-fields.disabled{opacity:.3;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">RIFT<span>WALK</span></div>
+  <span class="ver">v1.4</span>
+  <div class="status-dot" id="status-dot"></div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="api">Settings</div>
+  <div class="tab" data-tab="features">Features</div>
+  <div class="tab" data-tab="status">Status</div>
+</div>
+
+<!-- Settings Tab -->
+<div class="tab-content active" id="tab-api">
+  <div class="section-title">Pricing Mode</div>
+  <div class="mode-toggle">
+    <span class="mode-label" id="mode-label-pe">PricEmpire + CSFloat</span>
+    <label class="toggle mode-switch"><input type="checkbox" id="pricing-mode"><span class="slider"></span></label>
+    <span class="mode-label" id="mode-label-sp">Skinport</span>
+  </div>
+  <div class="help" id="mode-help" style="margin-top:6px">Buff163/Skins.com prices via PricEmpire + phase-specific Doppler pricing via CSFloat. Requires API keys.</div>
+
+  <div class="divider"></div>
+
+  <!-- PricEmpire + CSFloat fields -->
+  <div id="pe-fields">
+    <div class="section-title">PricEmpire</div>
+    <label>API Key (free Trader plan)</label>
+    <input type="password" id="api-key" placeholder="Paste PricEmpire API key">
+    <div class="help">Get free at <a href="https://pricempire.com/settings/developer" target="_blank">pricempire.com/settings/developer</a></div>
+
+    <div class="select-row">
+      <div class="select-col">
+        <label>Price source</label>
+        <select id="source">
+          <option value="buff163">Buff163</option>
+          <option value="skins">Skins.com</option>
+        </select>
+      </div>
+      <div class="select-col">
+        <label>Currency</label>
+        <select id="currency">
+          <option value="USD">USD ($)</option>
+          <option value="EUR">EUR (&euro;)</option>
+          <option value="GBP">GBP (&pound;)</option>
+          <option value="CNY">CNY (&yen;)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-title">CSFloat</div>
+    <label>API Key (for Doppler phase pricing)</label>
+    <input type="password" id="csfloat-key" placeholder="Optional — CSFloat API key">
+    <div class="help">Get at <a href="https://csfloat.com/profile" target="_blank">csfloat.com/profile</a> &gt; Developers tab</div>
+  </div>
+
+  <!-- Skinport fields -->
+  <div id="sp-fields" style="display:none">
+    <div class="section-title">Skinport</div>
+    <div class="help" style="margin-bottom:8px">No API key required. Prices are sourced from Skinport marketplace listings including phase-specific Doppler pricing.</div>
+    <div class="select-row">
+      <div class="select-col">
+        <label>Currency</label>
+        <select id="sp-currency">
+          <option value="USD">USD ($)</option>
+          <option value="EUR">EUR (&euro;)</option>
+          <option value="GBP">GBP (&pound;)</option>
+          <option value="CAD">CAD (C$)</option>
+          <option value="AUD">AUD (A$)</option>
+          <option value="CHF">CHF (Fr)</option>
+          <option value="CNY">CNY (&yen;)</option>
+          <option value="SEK">SEK (kr)</option>
+          <option value="PLN">PLN (z&#322;)</option>
+          <option value="BRL">BRL (R$)</option>
+          <option value="TRY">TRY (&#8378;)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn" id="save-btn">SAVE &amp; FETCH PRICES</button>
+  <div class="msg" id="msg"></div>
+
+  <div class="divider"></div>
+  <div class="section-title">Import / Export</div>
+  <button class="btn secondary" id="import-btn">&#128194; Import settings from JSON</button>
+  <input type="file" id="import-file" accept=".json" style="display:none">
+  <button class="btn secondary" id="export-btn">&#128190; Export settings to JSON</button>
+</div>
+
+<!-- Features Tab -->
+<div class="tab-content" id="tab-features">
+  <div class="feature-group">
+    <div class="feature-group-title">Pricing</div>
+    <div class="toggle-row"><label>Doppler phase pricing (CSFloat)</label><label class="toggle"><input type="checkbox" id="enable-doppler-prices" checked><span class="slider"></span></label></div>
+    <div class="toggle-row"><label>Stickers / Patches on hover</label><label class="toggle"><input type="checkbox" id="enable-stickers" checked><span class="slider"></span></label></div>
+  </div>
+
+  <div class="feature-group">
+    <div class="feature-group-title">Item Details</div>
+    <div class="toggle-row"><label>Float values</label><label class="toggle"><input type="checkbox" id="enable-floats" checked><span class="slider"></span></label></div>
+    <div class="toggle-row"><label>Fade percentage</label><label class="toggle"><input type="checkbox" id="enable-fade" checked><span class="slider"></span></label></div>
+    <div class="toggle-row"><label>Blue Gem tier</label><label class="toggle"><input type="checkbox" id="enable-bluegem" checked><span class="slider"></span></label></div>
+    <div class="toggle-row"><label>Pattern tier (Max Pink, F&amp;I, CW)</label><label class="toggle"><input type="checkbox" id="enable-pattern-tier" checked><span class="slider"></span></label></div>
+  </div>
+
+  <div class="feature-group">
+    <div class="feature-group-title">Inventory List</div>
+    <div class="toggle-row"><label>Include items with no price</label><label class="toggle"><input type="checkbox" id="enable-copy-unpriced" checked><span class="slider"></span></label></div>
+    <div class="toggle-row"><label>Show prices next to items</label><label class="toggle"><input type="checkbox" id="enable-copy-prices" checked><span class="slider"></span></label></div>
+  </div>
+
+  <div class="feature-group">
+    <div class="feature-group-title">Profile</div>
+    <div class="toggle-row"><label>SteamID64 copy button</label><label class="toggle"><input type="checkbox" id="enable-steamid" checked><span class="slider"></span></label></div>
+  </div>
+</div>
+
+<!-- Status Tab -->
+<div class="tab-content" id="tab-status">
+  <div class="section-title">Price Cache</div>
+  <div class="cache-info" id="cache-info">Loading...</div>
+  <button class="btn secondary" id="refresh-btn">&#8635; Force refresh prices</button>
+
+  <div class="divider"></div>
+  <div class="section-title">About</div>
+  <div class="cache-info">
+    <b>Riftwalk</b> — CS2 Trading Enhancer<br>
+    Inventory pricing, Doppler phases, floats, fade %, blue gem tiers, pattern detection, stickers, patches, trade offer comparison.<br><br>
+    <a href="https://rftwlk.com" target="_blank" style="color:#66c0f4;text-decoration:none">rftwlk.com</a>
+    <span style="margin:0 6px;color:#2a3a4a">·</span>
+    <a href="https://discord.gg/6MFAmebrHW" target="_blank" style="color:#5865F2;text-decoration:none">Discord</a>
+    <span style="margin:0 6px;color:#2a3a4a">·</span>
+    <a href="https://github.com/ilovecoding01234/riftwalk" target="_blank" style="color:#8b949e;text-decoration:none">GitHub</a>
+  </div>
+</div>
+
+<div class="footer">Riftwalk v1.4 &middot; rftwlk.com</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

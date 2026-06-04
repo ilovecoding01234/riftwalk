@@ -1,0 +1,73 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extName__",
+  "version": "1.4",
+  "description": "__MSG_extDescription__",
+  "default_locale": "en",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icons/icon48.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://steamcommunity.com/profiles/*/inventory*",
+        "*://steamcommunity.com/id/*/inventory*",
+        "*://steamcommunity.com/tradeoffer/*",
+        "*://steamcommunity.com/profiles/*/tradeoffers*",
+        "*://steamcommunity.com/id/*/tradeoffers*",
+        "*://steamcommunity.com/market/listings/730/*",
+        "*://steamcommunity.com/profiles/*",
+        "*://steamcommunity.com/id/*",
+        "*://steamcommunity.com/id/*/tradeoffers/*",
+        "*://steamcommunity.com/profiles/*/tradeoffers/*"
+      ],
+      "js": [
+        "inspect_decoder.js",
+        "skin_data.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://steamcommunity.com/profiles/*/inventory*",
+        "*://steamcommunity.com/id/*/inventory*",
+        "*://steamcommunity.com/tradeoffer/*"
+      ],
+      "js": [
+        "pageworld.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    }
+  ],
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "*://steamcommunity.com/*",
+    "*://api.pricempire.com/*",
+    "*://inspect.pricempire.com/*",
+    "*://api.csfloat.com/*",
+    "*://csfloat.com/*",
+    "*://api.steampowered.com/*",
+    "*://api.skinport.com/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; img-src 'self' https://steamcommunity.com https://community.fastly.steamstatic.com https://community.cloudflare.steamstatic.com https://community.akamai.steamstatic.com https://community.steamstatic.com https://cdn.fastly.steamstatic.com https://cdn.steamstatic.com https://cdn.akamai.steamstatic.com https://cdn.cloudflare.steamstatic.com"
+  },
+  "short_name": "Riftwalk"
+}

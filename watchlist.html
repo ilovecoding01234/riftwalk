@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Riftwalk - Investment Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0f18;color:#c7d5e0;font-family:'IBM Plex Sans',sans-serif;min-height:100vh}
+  .header{padding:20px 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(102,192,244,.08)}
+  .logo{font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:700;letter-spacing:3px}
+  .logo .r{color:#8a9aaa}.logo .w{color:#66c0f4}
+  .logo-sub{font-size:11px;color:#4a5c6d;margin-left:12px;font-weight:400;letter-spacing:1px}
+  .header-right{display:flex;gap:12px;align-items:center}
+  .header-btn{background:rgba(102,192,244,.08);border:1px solid rgba(102,192,244,.12);color:#66c0f4;padding:6px 16px;border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s;font-family:inherit}
+  .header-btn:hover{background:rgba(102,192,244,.15);border-color:rgba(102,192,244,.25)}
+  .header-btn.danger{color:#ef4444;border-color:rgba(239,68,68,.15);background:rgba(239,68,68,.05)}
+  .header-btn.danger:hover{background:rgba(239,68,68,.12)}
+  .container{max-width:1200px;margin:0 auto;padding:24px 32px}
+  .add-section{background:rgba(255,255,255,.02);border:1px solid rgba(102,192,244,.06);border-radius:12px;padding:20px;margin-bottom:24px}
+  .add-section h3{font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:600;color:#fff;margin-bottom:12px}
+  .add-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+  .add-field{display:flex;flex-direction:column;gap:4px}
+  .add-field label{font-size:10px;color:#4a5c6d;text-transform:uppercase;letter-spacing:1px}
+  .add-search{flex:1 1 240px;min-width:200px;position:relative}
+  .add-search input,.add-field input,.add-field select{padding:9px 14px;background:rgba(255,255,255,.03);border:1px solid rgba(102,192,244,.08);border-radius:8px;color:#c7d5e0;font-size:13px;font-family:inherit;outline:none;transition:border-color .15s}
+  .add-search input:focus,.add-field input:focus{border-color:rgba(102,192,244,.25)}
+  .add-search input::placeholder{color:#3a4a5a}
+  .add-field select{cursor:pointer}
+  select option{background:#10161d;color:#c7d5e0}
+  .autocomplete{position:absolute;top:100%;left:0;right:0;background:#0d1420;border:1px solid rgba(102,192,244,.12);border-radius:0 0 8px 8px;max-height:240px;overflow-y:auto;z-index:10;display:none}
+  .autocomplete.active{display:block}
+  .ac-item{padding:8px 16px;font-size:12px;cursor:pointer;transition:background .1s;display:flex;justify-content:space-between}
+  .ac-item:hover,.ac-item.ac-active{background:rgba(102,192,244,.06)}
+  .ac-item .ac-price{color:#66c0f4;font-weight:500}
+  .add-btn{padding:9px 24px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.2);border-radius:8px;color:#34d399;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit;white-space:nowrap}
+  .add-btn:hover{background:rgba(52,211,153,.25)}
+  .add-btn.sell{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.15);color:#ef4444}
+  .add-btn.sell:hover{background:rgba(239,68,68,.2)}
+  .stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
+  .stat-card{background:rgba(255,255,255,.02);border:1px solid rgba(102,192,244,.06);border-radius:10px;padding:16px;text-align:center}
+  .stat-value{font-size:22px;font-weight:700;margin-bottom:2px}
+  .stat-label{font-size:10px;color:#4a5c6d;text-transform:uppercase;letter-spacing:1.5px}
+  .green{color:#4ade80}.red{color:#ef4444}.dim{color:#4a5c6d}
+  .items-section{background:rgba(255,255,255,.02);border:1px solid rgba(102,192,244,.06);border-radius:12px;overflow:hidden}
+  .items-header{display:grid;grid-template-columns:36px 1fr 90px 90px 90px 70px 90px 50px 30px;padding:10px 16px;font-size:10px;color:#4a5c6d;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(102,192,244,.06)}
+  .item-row{display:grid;grid-template-columns:36px 1fr 90px 90px 90px 70px 90px 50px 30px;padding:6px 16px;font-size:12px;border-bottom:1px solid rgba(255,255,255,.02);transition:background .1s;align-items:center;cursor:pointer}
+  .item-row:hover{background:rgba(102,192,244,.04)}
+  .item-row:last-child{border-bottom:none}
+  .item-name{color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item-name .sub{font-size:9px;color:#3a4a5a;margin-top:1px}
+  .item-price{text-align:right;font-weight:500}
+  .sort-col{user-select:none;transition:color .12s}
+  .sort-col:hover{color:#66c0f4}
+  .sort-ind{margin-left:3px;font-size:9px;color:#66c0f4}
+  .item-qty{text-align:center;color:#6a7a8a}
+  .item-remove{text-align:center;cursor:pointer;color:#3a4a5a;font-size:14px;transition:color .15s}
+  .item-remove:hover{color:#ef4444}
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;justify-content:center;align-items:center}
+  .modal-overlay.active{display:flex}
+  .modal{background:#0d1420;border:1px solid rgba(102,192,244,.12);border-radius:12px;padding:24px;width:500px;max-height:80vh;overflow-y:auto}
+  .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  .modal-title{font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;color:#fff}
+  .modal-close{color:#4a5c6d;cursor:pointer;font-size:20px;background:none;border:none}
+  .modal-close:hover{color:#fff}
+  .empty-state{text-align:center;padding:60px 20px;color:#3a4a5a}
+  .empty-state h2{font-family:'Rajdhani',sans-serif;font-size:24px;color:#4a5c6d;margin-bottom:8px}
+  .empty-state p{font-size:13px;line-height:1.7}
+  .footer{text-align:center;padding:24px;font-size:10px;color:#2a3a4a}
+</style>
+</head>
+<body>
+<div class="header">
+  <div style="display:flex;align-items:baseline">
+    <div class="logo"><span class="r">RIFT</span><span class="w">WALK</span></div>
+    <span class="logo-sub">Investment Tracker</span>
+  </div>
+  <div class="header-right">
+    <button class="header-btn" id="import-btn">📤 Import</button>
+    <button class="header-btn" id="export-btn">📥 Export</button>
+    <button class="header-btn danger" id="clear-btn">🗑 Clear</button>
+    <input type="file" id="import-file" accept=".json" style="display:none">
+  </div>
+</div>
+<div class="container">
+  <div id="currency-warning" style="display:none;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#fcd34d;line-height:1.5"></div>
+  <div id="csfloat-hint" style="display:none;background:rgba(102,192,244,.06);border:1px solid rgba(102,192,244,.18);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#8bb8d4;line-height:1.5;align-items:flex-start;gap:12px">
+    <span style="flex:1">💡 Add a CSFloat API key in the extension settings to load images for high-value items (knives, gloves, and other skins above Steam's price cap).</span>
+    <span id="csfloat-hint-close" title="Dismiss" style="cursor:pointer;color:#4a5c6d;font-size:14px;line-height:1;padding:0 2px;flex-shrink:0;transition:color .15s">✕</span>
+  </div>
+  <div class="add-section">
+    <h3>Add Transaction</h3>
+    <div id="no-prices-warning" style="display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#fca5a5;line-height:1.5">
+      ⚠️ <strong>No prices loaded.</strong> Item search and pricing won't work until prices are fetched. Open the Riftwalk popup and load prices (set your PricEmpire API key or switch to Skinport mode), then reopen this page.
+    </div>
+    <div class="add-row">
+      <div class="add-field add-search">
+        <label>Item</label>
+        <input type="text" id="item-search" placeholder="🔍 Search any CS2 item...">
+        <div class="autocomplete" id="autocomplete"></div>
+      </div>
+      <div class="add-field">
+        <label>Type</label>
+        <select id="tx-type" style="width:90px"><option value="buy">Buy</option><option value="sell">Sell</option></select>
+      </div>
+      <div class="add-field">
+        <label id="tx-price-label">Price paid</label>
+        <input type="number" id="tx-price" step="0.01" min="0" placeholder="0.00" style="width:140px">
+      </div>
+      <div class="add-field">
+        <label>Qty</label>
+        <input type="number" id="tx-qty" value="1" min="1" style="width:90px">
+      </div>
+      <div class="add-field">
+        <label>Date</label>
+        <input type="date" id="tx-date" style="width:150px">
+      </div>
+      <button class="add-btn" id="add-btn">+ Buy</button>
+    </div>
+  </div>
+
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card"><div class="stat-value" id="s-invested" style="color:#66c0f4">—</div><div class="stat-label">Total Invested</div></div>
+    <div class="stat-card"><div class="stat-value" id="s-current" style="color:#fff">—</div><div class="stat-label">Current Value</div></div>
+    <div class="stat-card"><div class="stat-value" id="s-pnl">—</div><div class="stat-label">Unrealized P&L</div></div>
+    <div class="stat-card"><div class="stat-value" id="s-realized">—</div><div class="stat-label">Realized P&L</div></div>
+    <div class="stat-card"><div class="stat-value" id="s-roi">—</div><div class="stat-label">ROI</div></div>
+  </div>
+  <div id="highlights-row" style="display:none;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+    <div class="stat-card" style="text-align:left"><div style="font-size:10px;color:#6a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">📈 Top Performer</div><div id="best-perf" style="font-size:13px;color:#fff">—</div></div>
+    <div class="stat-card" style="text-align:left"><div style="font-size:10px;color:#6a7a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">📉 Worst Performer</div><div id="worst-perf" style="font-size:13px;color:#fff">—</div></div>
+  </div>
+
+  <div id="allocation-section" style="display:none;background:rgba(255,255,255,.02);border:1px solid rgba(102,192,244,.06);border-radius:12px;padding:16px 20px;margin-bottom:16px">
+    <div style="font-size:11px;color:#4a5c6d;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Portfolio Allocation</div>
+    <div id="allocation-bar" style="display:flex;height:14px;border-radius:7px;overflow:hidden;margin-bottom:12px;background:rgba(255,255,255,.03)"></div>
+    <div id="allocation-legend" style="display:flex;flex-wrap:wrap;gap:10px 18px;font-size:12px"></div>
+  </div>
+
+  <div class="items-section" id="items-section">
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.04)">
+      <input type="text" id="items-filter" placeholder="🔍 Filter holdings..." style="flex:1;min-width:140px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:6px;color:#c7d5e0;font-family:inherit;font-size:12px;padding:7px 10px">
+    </div>
+    <div class="items-header">
+      <span></span>
+      <span class="sort-col" data-sort="name" style="cursor:pointer">Item<span class="sort-ind"></span></span>
+      <span class="sort-col" data-sort="avgcost" style="text-align:right;cursor:pointer">Avg Cost<span class="sort-ind"></span></span>
+      <span class="sort-col" data-sort="current" style="text-align:right;cursor:pointer">Current<span class="sort-ind"></span></span>
+      <span class="sort-col" data-sort="pnl" style="text-align:right;cursor:pointer">P&L<span class="sort-ind"></span></span>
+      <span class="sort-col" data-sort="roi" style="text-align:right;cursor:pointer">ROI<span class="sort-ind"></span></span>
+      <span class="sort-col" data-sort="value" style="text-align:right;cursor:pointer">Value<span class="sort-ind"></span></span>
+      <span class="sort-col" data-sort="qty" style="text-align:center;cursor:pointer">Qty<span class="sort-ind"></span></span>
+      <span></span>
+    </div>
+    <div id="items-list"></div>
+  </div>
+
+  <div id="realized-section" style="display:none;background:rgba(255,255,255,.02);border:1px solid rgba(102,192,244,.06);border-radius:12px;padding:16px 20px;margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:11px;color:#4a5c6d;text-transform:uppercase;letter-spacing:1px">Realized P&L History</div>
+      <div id="realized-total" style="font-size:13px;font-weight:600">—</div>
+    </div>
+    <div id="realized-list"></div>
+  </div>
+  <div class="empty-state" id="empty" style="display:none">
+    <h2>No investments tracked</h2>
+    <p>Search for an item above and log your purchase to start tracking.<br>See your unrealized P&L, ROI, and cost basis at a glance.</p>
+  </div>
+
+  <div class="add-section" id="watch-section" style="margin-top:28px">
+    <h3 style="display:flex;align-items:center;gap:8px">🎯 Price Watch <span style="font-size:12px;color:#4a5c6d;font-weight:400;letter-spacing:0">Get alerted when a skin hits your target price</span></h3>
+    <div class="add-row">
+      <div class="add-field add-search" style="flex:1;min-width:200px">
+        <label>Item</label>
+        <input type="text" id="watch-search" placeholder="🔍 Search a skin to watch...">
+        <div class="autocomplete" id="watch-autocomplete"></div>
+      </div>
+      <div class="add-field">
+        <label>Alert when price is</label>
+        <select id="watch-dir" style="width:120px"><option value="below">At or below</option><option value="above">At or above</option></select>
+      </div>
+      <div class="add-field">
+        <label>Target price</label>
+        <input type="number" id="watch-target" step="0.01" min="0" placeholder="0.00" style="width:110px">
+      </div>
+      <button class="add-btn" id="watch-add-btn">+ Watch</button>
+    </div>
+    <div id="watch-list" style="margin-top:14px"></div>
+  </div>
+
+  <div class="empty-state" id="watch-empty" style="display:none">
+    <h2>No price alerts yet</h2>
+    <p>Search for a skin above and set a target price.<br>The row turns green when your target is hit.</p>
+  </div>
+</div>
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-item-name">—</div>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div id="modal-info"></div>
+  </div>
+</div>
+<div class="footer">Riftwalk v1.4 - rftwlk.com</div>
+<script src="watchlist.js"></script>
+</body>
+</html>

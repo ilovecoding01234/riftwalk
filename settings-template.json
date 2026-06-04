@@ -1,0 +1,14 @@
+{
+  "pricempireKey": "",
+  "csfloatKey": "",
+  "priceSource": "buff163",
+  "currency": "USD",
+  "enableFloats": true,
+  "enableDopplerPrices": true,
+  "enableStickers": true,
+  "enableTradelock": true,
+  "enableSteamId": true,
+  "enableFadeDetection": true,
+  "enableBlueGem": true,
+  "enablePatternTier": true
+}
