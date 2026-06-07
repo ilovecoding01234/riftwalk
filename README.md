@@ -2,7 +2,7 @@
 
 > Free browser extension that adds instant pricing, float values, Doppler phase detection, pattern tiers, sticker values, trade offer comparison, case opening stats, portfolio tracking, and an investment tracker directly to your Steam inventory.
 
-![Version](https://img.shields.io/badge/version-1.4-blue)
+![Version](https://img.shields.io/badge/version-1.5-blue)
 ![License](https://img.shields.io/badge/license-GPL--3.0-green)
 ![Chrome](https://img.shields.io/badge/platform-Chrome%20%7C%20Firefox%20%7C%20Edge%20%7C%20Brave%20%7C%20Opera-orange)
 
@@ -77,6 +77,7 @@
 - **Profit/loss with %** on trade offer creation page
 - **PnL on incoming/sent offers** via Steam API
 - **Manual price override** for Dopplers and special items
+- **Fast Accept / Fast Decline** - accept or decline incoming offers straight from the offers list without opening each one
 
 ### Profile Buttons
 - **Copy SteamID64** - one click copy
@@ -173,6 +174,12 @@
 ---
 
 ## Changelog
+
+### v1.5
+- **Faster inventory total** - the total value loads faster and updates in fewer, larger steps instead of slowly ticking up item by item
+- **Smoother large trade offers** - scrolling and paging through big inventories (hundreds of items) on the trade offer page is no longer laggy
+- **Doppler price caching** - Doppler and gem prices are cached across inventories for 12 hours, so revisiting or viewing other inventories with the same knives loads instantly and hits CSFloat far less often
+- **Fast Accept and Fast Decline** - accept or decline incoming trade offers directly from the offers list without opening each one, useful for bulk gift deliveries like opening lots of cases (offers where you give items still require Steam mobile confirmation as usual)
 
 ### v1.4
 - **Fix** - Inventory float and pattern values now load reliably for items whose inspect links resolve after the page renders

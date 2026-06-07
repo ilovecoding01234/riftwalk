@@ -160,8 +160,18 @@
       }
     } catch(e) {}
   }
+  // Compute inventory total from data only (invDescs + price cache), no DOM work.
+  // This is independent of the labeling loop, so it can show instantly the moment
+  // assets + prices are available, instead of counting up as tiles get decorated.
+  function computeAndShowTotal() {
+    let total = 0, priced = 0, count = 0;
+    invDescs.forEach((desc, aid) => { const n = desc.market_hash_name; if (!n) return; count++; const c = getCents(n, aid); if (c) { total += c; priced++; } });
+    updateBar(total, count, priced);
+    return { total, count, priced };
+  }
   document.addEventListener('rw-assets-ready', () => {
     readPageAssets();
+    if (IS_INVENTORY) computeAndShowTotal(); // instant total, before/independent of labeling
     if (IS_INVENTORY) processItems();
     if (IS_TRADEOFFER) processTradeItems();
   });
@@ -358,6 +368,14 @@
       .rw-sel-clear:hover{border-color:#e74c3c;color:#e74c3c}
       .rw-ctrl-hint{font-size:10px;color:#445;margin-left:6px;font-style:italic}
       .rw-offer-total{background:linear-gradient(180deg,#0d1b2a,#0a1520);border:1px solid rgba(102,192,244,.15);border-radius:4px;padding:6px 14px;margin:6px 0;font-family:'Motiva Sans',Arial,sans-serif;font-size:12px;display:flex;gap:10px;align-items:center}
+      .rw-fast-accept,.rw-fast-decline{display:inline-block;margin-right:8px;padding:2px 8px;font-family:'Motiva Sans',Arial,sans-serif;font-size:12px;font-weight:600;text-decoration:none;border-radius:2px;cursor:pointer;vertical-align:middle;transition:color .12s,background .12s}
+      .rw-fast-accept{color:#a6e22e;border:1px solid rgba(166,226,46,.45);background:rgba(166,226,46,.07)}
+      .rw-fast-accept:hover{background:rgba(166,226,46,.16);color:#c7ff5e}
+      .rw-fast-decline{color:#e2856e;border:1px solid rgba(226,133,110,.45);background:rgba(226,133,110,.07)}
+      .rw-fast-decline:hover{background:rgba(226,133,110,.16);color:#ff9c80}
+      .rw-fast-accept.rw-fa-disabled,.rw-fast-decline.rw-fa-disabled{opacity:.6;cursor:default;pointer-events:none}
+      .rw-fast-accept.rw-fast-accepted{color:#9be8b4;border-color:rgba(76,175,80,.6);background:rgba(76,175,80,.12)}
+      .rw-fast-decline.rw-fast-declined{color:#c9c9c9;border-color:rgba(150,150,150,.5);background:rgba(150,150,150,.12)}
       .rw-edit-btn{position:absolute;bottom:8px;right:7px;cursor:pointer;z-index:92;opacity:.4;transition:opacity .15s;pointer-events:auto;width:10px;height:10px}
       .rw-edit-btn:hover{opacity:1}
       .rw-edit-btn svg{width:10px;height:10px;fill:none;stroke:#c7d5e0;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -440,6 +458,12 @@
       if (Object.keys(dc).length) console.log(`[Riftwalk] Loaded ${Object.keys(dc).length} cached Doppler phases`);
     } catch(e) {}
 
+    // Load the persistent weapon+phase price cache (shared across ALL inventories).
+    // Keyed by "marketHashName|phase" with a timestamp; entries older than the TTL
+    // are ignored so prices stay reasonably fresh. This is what prevents re-querying
+    // CSFloat for the same Doppler combo on every new inventory / reload.
+    await loadDopplerComboCache();
+
     invDescs.forEach((desc, aid) => {
       if (dopplerPhases.has(aid)) return;
       const name = desc.market_hash_name || '';
@@ -464,6 +488,33 @@
     chrome.storage.local.set({ rw_doppler_cache: dc });
   }
 
+  // Persistent weapon+phase price cache (shared across all inventories, survives reload).
+  // Key: "marketHashName|phase" -> { price, ts }. Entries older than DOPPLER_COMBO_TTL
+  // are treated as stale and re-fetched, keeping prices reasonably fresh.
+  const DOPPLER_COMBO_TTL = 12 * 60 * 60 * 1000; // 12 hours
+  async function loadDopplerComboCache() {
+    try {
+      const stored = (await chrome.storage.local.get(['rw_doppler_combo_cache'])).rw_doppler_combo_cache || {};
+      const now = Date.now();
+      let loaded = 0, expired = 0;
+      for (const [key, entry] of Object.entries(stored)) {
+        if (entry && entry.price != null && entry.ts && (now - entry.ts) < DOPPLER_COMBO_TTL) {
+          dopplerPriceCache.set(key, entry.price);
+          loaded++;
+        } else { expired++; }
+      }
+      if (loaded || expired) console.log(`[Riftwalk] Doppler combo cache: ${loaded} fresh, ${expired} expired`);
+    } catch(e) { console.warn('[Riftwalk] combo cache load error:', e); }
+  }
+  // Write a single weapon+phase price to the persistent combo cache with a timestamp.
+  function saveDopplerComboPrice(cacheKey, price) {
+    chrome.storage.local.get(['rw_doppler_combo_cache'], (r) => {
+      const cache = r.rw_doppler_combo_cache || {};
+      cache[cacheKey] = { price, ts: Date.now() };
+      chrome.storage.local.set({ rw_doppler_combo_cache: cache });
+    });
+  }
+
   // ── Doppler pricing via CSFloat listings ──────────────────
   // Phase name → all possible paint_indices for CSFloat query
   const PHASE_ALL_INDICES = {};
@@ -473,6 +524,21 @@
   });
 
   const dopplerPriceCache = new Map(); // "weapon|phase" -> price in cents
+  // Throttle CSFloat requests so a big Doppler-heavy inventory doesn't burst into
+  // a 429 rate limit. Each request waits until at least CSFLOAT_MIN_GAP ms after the
+  // previous one started. Serialized via a simple promise chain.
+  const CSFLOAT_MIN_GAP = 50;
+  let csfloatGate = Promise.resolve();
+  let csfloatLastStart = 0;
+  function csfloatThrottle() {
+    csfloatGate = csfloatGate.then(async () => {
+      const now = Date.now();
+      const wait = Math.max(0, csfloatLastStart + CSFLOAT_MIN_GAP - now);
+      if (wait) await new Promise(r => setTimeout(r, wait));
+      csfloatLastStart = Date.now();
+    });
+    return csfloatGate;
+  }
   async function fetchDopplerPrice(aid, marketHashName, phase, actualPaintIndex) {
     if (settings.enableDopplerPrices === false || dopplerPrices.has(aid)) return;
     // Check weapon+phase cache first — no need to re-fetch same combo
@@ -495,6 +561,7 @@
           const price = spDopplers[spKey];
           dopplerPrices.set(aid, price);
           dopplerPriceCache.set(cacheKey, price);
+          saveDopplerComboPrice(cacheKey, price); // persist across inventories (12h)
           console.log(`[Riftwalk] Doppler ${phase} price from Skinport: ${fmt(price)}`);
           saveDopplerCache();
           const el = document.getElementById(`730_2_${aid}`) || document.getElementById(`730_16_${aid}`) || document.getElementById(`item730_2_${aid}`) || document.getElementById(`item730_16_${aid}`);
@@ -526,6 +593,7 @@
       let bestPrice = null;
       for (const pi of indicesToTry) {
         if (!pi) continue;
+        await csfloatThrottle(); // space out requests to avoid 429 rate limiting
         const params = new URLSearchParams({ market_hash_name: marketHashName, sort_by: 'lowest_price', limit: '1', type: 'buy_now', paint_index: pi.toString() });
         const url = `https://csfloat.com/api/v1/listings?${params}`;
         const r = await chrome.runtime.sendMessage({ type: 'FETCH', url, options: { headers } });
@@ -543,6 +611,7 @@
       if (bestPrice) {
           dopplerPrices.set(aid, bestPrice);
           dopplerPriceCache.set(cacheKey, bestPrice);
+          saveDopplerComboPrice(cacheKey, bestPrice); // persist weapon|phase across inventories (12h)
           console.log(`[Riftwalk] Doppler ${phase || 'generic'} final price: ${fmt(bestPrice)}`);
           saveDopplerCache();
           const el = document.getElementById(`730_2_${aid}`) || document.getElementById(`730_16_${aid}`) || document.getElementById(`item730_2_${aid}`) || document.getElementById(`item730_16_${aid}`);
@@ -811,7 +880,10 @@
   // ── Label item ────────────────────────────────────────────
   function labelItem(el) {
     const aid = getAssetId(el), name = getItemName(el);
-    if (getComputedStyle(el).position === 'static') { el.style.position = 'relative'; el.style.overflow = 'hidden'; }
+    // Avoid getComputedStyle here — it forces a synchronous reflow on every item,
+    // which causes scroll jank on large trade pickers. Set position once via a
+    // cheap inline-style check/flag instead.
+    if (!el.dataset.rwPos) { el.style.position = 'relative'; el.style.overflow = 'hidden'; el.dataset.rwPos = '1'; }
     const price = getPrice(name, aid), isDop = isDopplerItem(name), hasDop = aid && dopplerPrices.has(aid);
     const desc = aid ? invDescs.get(aid) : null;
     const buffUrl = getBuffLink(name);
@@ -1331,11 +1403,18 @@
     const area = document.querySelector('.trade_area,.tradeoffer_items_header'); if (area) area.insertAdjacentElement('beforebegin', bar); else document.body.prepend(bar);
   }
   let tradeProcessing = false;
+  let lastTradeAssetDumpLen = -1;
   function processTradeItems() {
     if (tradeProcessing) return;
     tradeProcessing = true;
-    setTimeout(() => { tradeProcessing = false; }, 500);
-    readPageAssets(); let give=0,recv=0;
+    setTimeout(() => { tradeProcessing = false; }, 300);
+    // Only re-parse the full asset dump when it actually changed. This is a
+    // whole-inventory JSON.parse and was running on every 200ms re-label pass,
+    // needlessly hammering the main thread and blocking scroll on big pickers.
+    const dumpEl = document.getElementById('rw-asset-dump');
+    const dumpLen = dumpEl ? (dumpEl.textContent || '').length : 0;
+    if (dumpLen !== lastTradeAssetDumpLen) { lastTradeAssetDumpLen = dumpLen; readPageAssets(); }
+    let give=0,recv=0;
     const yourItems = document.querySelectorAll("#your_slots .item,#trade_yours .item");
     const theirItems = document.querySelectorAll("#their_slots .item,#trade_theirs .item");
     yourItems.forEach(el => { labelItem(el); const c = getCents(getItemName(el),getAssetId(el)); if (c) give += c; });
@@ -1357,10 +1436,12 @@
     }
     if (toLabel.length > 100) {
       const unlabeled = toLabel.filter(el => !el.querySelector('.rw-price'));
-      unlabeled.slice(0, 60).forEach(el => labelItem(el));
-      const relabel = toLabel.filter(el => el.querySelector('.rw-price') && !el.querySelector('.rw-float-text') && !el.dataset.rwFh).slice(0, 20);
+      unlabeled.slice(0, 25).forEach(el => labelItem(el));
+      const relabel = toLabel.filter(el => el.querySelector('.rw-price') && !el.querySelector('.rw-float-text') && !el.dataset.rwFh).slice(0, 10);
       relabel.forEach(el => labelItem(el));
-      if (unlabeled.length > 60 || relabel.length > 0) setTimeout(processTradeItems, 200);
+      // Smaller batches + a short yield keep the main thread free between passes
+      // so scrolling/paging the picker stays responsive on large inventories.
+      if (unlabeled.length > 25 || relabel.length > 0) { tradeProcessing = false; setTimeout(processTradeItems, 60); }
     } else {
       toLabel.forEach(el => labelItem(el));
     }
@@ -1556,6 +1637,162 @@
     });
   }
 
+  // ── Fast Accept for incoming GIFT offers (nothing on your side) ──
+  // Only shown on incoming offers where you give zero items, so accepting can only
+  // ADD to your inventory — it can never give anything away. Click-initiated per
+  // offer (never silent/auto). Receive-only accepts need no mobile confirmation.
+  function getSessionId() {
+    // Steam exposes g_sessionID on the page; fall back to the cookie.
+    try { if (typeof window.g_sessionID === 'string' && window.g_sessionID) return window.g_sessionID; } catch(e) {}
+    const m = document.cookie.match(/sessionid=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+  function addFastAcceptButtons() {
+    document.querySelectorAll('.tradeoffer').forEach(offer => {
+      // Derive the offer id from the element id: "tradeofferid_XXXX"
+      const offerId = (offer.id || '').replace('tradeofferid_', '');
+      if (!offerId || !/^\d+$/.test(offerId)) return;
+      if (offer.querySelector('.rw-fast-accept')) return; // already added
+
+      const itemLists = offer.querySelectorAll('.tradeoffer_item_list');
+      if (itemLists.length < 2) return;
+      const headerText = offer.querySelector('.tradeoffer_header')?.textContent || '';
+      const youOffered = headerText.includes('You offered');
+      if (youOffered) return; // only incoming offers
+
+      // Note: we show both buttons on ALL incoming offers now, not just empty-side gifts.
+      // For offers where you GIVE items, Steam still requires mobile authenticator
+      // confirmation to complete - so a misclicked Fast Accept can't transfer anything
+      // away without your phone. Decline is always safe (nothing transfers either way).
+
+      // Only ACTIVE, actionable incoming offers. From Steam's real markup:
+      //  - active offers have <div class="tradeoffer_items_ctn ... active">
+      //  - and a footer action link "Respond to Offer" / Decline (javascript:ShowTradeOffer/DeclineTradeOffer)
+      // Historical/accepted/declined offers lack the active class and these actions.
+      // (Note: the "tradeoffer_items_banner" is NOT a historical marker - active offers
+      //  use it for the "trade protected" notice, so we must not gate on it.)
+      const isActive = !!offer.querySelector('.tradeoffer_items_ctn.active');
+      const hasAction = !!offer.querySelector('.tradeoffer_footer_actions a[href*="ShowTradeOffer"], .tradeoffer_footer_actions a[href*="DeclineTradeOffer"]');
+      if (!isActive || !hasAction) return;
+
+      // Partner steamID: convert the sender's 32-bit miniprofile to steamID64.
+      // Target the partner container specifically - the offer also contains YOUR
+      // miniprofile (the "For your" side), so a blind first-match could grab the wrong one.
+      let partner = null;
+      const partnerEl = offer.querySelector('.tradeoffer_partner [data-miniprofile]')
+                     || offer.querySelector('.tradeoffer_items.primary [data-miniprofile]')
+                     || offer.querySelector('[data-miniprofile]');
+      if (partnerEl?.dataset?.miniprofile) {
+        try { partner = (BigInt('76561197960265728') + BigInt(partnerEl.dataset.miniprofile)).toString(); } catch(e) {}
+      }
+
+      // Build the button - placed inline with Steam's own footer actions
+      const actions = offer.querySelector('.tradeoffer_footer_actions');
+      const footer = actions || offer.querySelector('.tradeoffer_footer') || offer;
+      const btn = document.createElement('a');
+      btn.href = 'javascript:void(0)';
+      btn.className = 'rw-fast-accept whiteLink';
+      btn.textContent = '\u26A1 Fast Accept';
+      // Tooltip reflects whether this offer is a pure gift or needs mobile confirmation
+      const yourItemCount = itemLists[1].querySelectorAll('.trade_item').length;
+      btn.title = yourItemCount === 0
+        ? 'Accept this incoming gift instantly (nothing leaves your inventory)'
+        : 'Accept this offer (you give items, so Steam will ask for mobile confirmation)';
+      const setDone = (txt) => { btn.textContent = txt; btn.classList.add('rw-fa-disabled'); btn.dataset.busy = '1'; };
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (btn.dataset.busy) return; // already accepting / finished
+        const sessionid = getSessionId();
+        if (!sessionid) { btn.textContent = 'No session - reload page'; return; }
+        if (!partner) { setDone('Open offer to accept'); return; }
+        btn.dataset.busy = '1'; btn.classList.add('rw-fa-disabled'); btn.textContent = 'Accepting\u2026';
+        try {
+          const body = `sessionid=${encodeURIComponent(sessionid)}&serverid=1&tradeofferid=${offerId}&partner=${partner}&captcha=`;
+          // Fetch from the content script (runs on steamcommunity.com) so the request
+          // carries Steam's own Origin + cookies, exactly like the native accept button.
+          // A background-worker fetch sends the extension origin and gets a 403.
+          const resp = await fetch(`https://steamcommunity.com/tradeoffer/${offerId}/accept`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+              'X-Requested-With': 'XMLHttpRequest'
+            },
+            body,
+            referrer: `https://steamcommunity.com/tradeoffer/${offerId}/`
+          });
+          let data = null; try { data = await resp.json(); } catch(e) {}
+          if (resp.ok && !(data && data.strError)) {
+            if (data && data.needs_mobile_confirmation) {
+              // You gave items - Steam accepted the request but the trade only
+              // completes once you confirm in the Steam Mobile app.
+              btn.textContent = '\u2713 Confirm on phone';
+              btn.classList.add('rw-fast-accepted');
+            } else {
+              btn.textContent = '\u2713 Accepted';
+              btn.classList.add('rw-fast-accepted');
+              offer.style.opacity = '0.55';
+            }
+          } else {
+            btn.classList.remove("rw-fa-disabled"); delete btn.dataset.busy;
+            const se = data?.strError;
+            btn.textContent = se ? 'Steam: try normal Accept' : `Failed (${resp.status}) - use normal Accept`;
+            console.warn('[Riftwalk] Fast accept failed:', resp.status, se || '');
+          }
+        } catch (err) {
+          btn.classList.remove("rw-fa-disabled"); delete btn.dataset.busy;
+          btn.textContent = 'Failed - try normal Accept';
+          console.warn('[Riftwalk] Fast accept error:', err);
+        }
+      });
+      footer.insertAdjacentElement('afterbegin', btn);
+
+      // ── Fast Decline (to the right of Fast Accept) ──
+      // Declining only rejects the offer - nothing enters or leaves your inventory,
+      // so it's even lower-risk than accept. Needs only sessionid.
+      const dbtn = document.createElement('a');
+      dbtn.href = 'javascript:void(0)';
+      dbtn.className = 'rw-fast-decline whiteLink';
+      dbtn.textContent = '\u2715 Fast Decline';
+      dbtn.title = 'Decline this incoming offer instantly';
+      dbtn.addEventListener('click', async (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (dbtn.dataset.busy) return;
+        const sessionid = getSessionId();
+        if (!sessionid) { dbtn.textContent = 'No session - reload page'; return; }
+        dbtn.dataset.busy = '1'; dbtn.classList.add('rw-fa-disabled'); dbtn.textContent = 'Declining\u2026';
+        try {
+          const body = `sessionid=${encodeURIComponent(sessionid)}`;
+          const resp = await fetch(`https://steamcommunity.com/tradeoffer/${offerId}/decline`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+              'X-Requested-With': 'XMLHttpRequest'
+            },
+            body,
+            referrer: `https://steamcommunity.com/tradeoffer/${offerId}/`
+          });
+          let data = null; try { data = await resp.json(); } catch(e) {}
+          if (resp.ok && !(data && data.strError)) {
+            dbtn.textContent = '\u2713 Declined';
+            dbtn.classList.add('rw-fast-declined');
+            offer.style.opacity = '0.55';
+          } else {
+            dbtn.classList.remove('rw-fa-disabled'); delete dbtn.dataset.busy;
+            dbtn.textContent = `Failed (${resp.status}) - use normal Decline`;
+            console.warn('[Riftwalk] Fast decline failed:', resp.status, data?.strError || '');
+          }
+        } catch (err) {
+          dbtn.classList.remove('rw-fa-disabled'); delete dbtn.dataset.busy;
+          dbtn.textContent = 'Failed - try normal Decline';
+          console.warn('[Riftwalk] Fast decline error:', err);
+        }
+      });
+      btn.insertAdjacentElement('afterend', dbtn);
+    });
+  }
+
   async function processTradeOffersList() {
     // Fetch prices if not loaded
     if (!Object.keys(priceMap).length) {
@@ -1675,6 +1912,8 @@
 
     // Calculate totals per trade offer
     recalcTradeOfferTotals();
+    // Add Fast Accept buttons to incoming gift offers (empty on your side)
+    addFastAcceptButtons();
   }
 
   // ── URL change ────────────────────────────────────────────
@@ -1794,7 +2033,7 @@
     setupObserver();
     chrome.runtime.onMessage.addListener(msg => {
       if (msg.type === 'PRICES_UPDATED') chrome.storage.local.get(['rw_prices_cache'], r => {
-        if (r.rw_prices_cache?.data) { priceMap = r.rw_prices_cache.data; if (IS_INVENTORY) processItems(); if (IS_TRADEOFFER) processTradeItems(); }
+        if (r.rw_prices_cache?.data) { priceMap = r.rw_prices_cache.data; if (IS_INVENTORY) { computeAndShowTotal(); processItems(); } if (IS_TRADEOFFER) processTradeItems(); }
       });
     });
   }
