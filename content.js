@@ -368,7 +368,7 @@
       .rw-sel-clear:hover{border-color:#e74c3c;color:#e74c3c}
       .rw-ctrl-hint{font-size:10px;color:#445;margin-left:6px;font-style:italic}
       .rw-offer-total{background:linear-gradient(180deg,#0d1b2a,#0a1520);border:1px solid rgba(102,192,244,.15);border-radius:4px;padding:6px 14px;margin:6px 0;font-family:'Motiva Sans',Arial,sans-serif;font-size:12px;display:flex;gap:10px;align-items:center}
-      .rw-fast-accept,.rw-fast-decline{display:inline-block;margin-right:8px;padding:2px 8px;font-family:'Motiva Sans',Arial,sans-serif;font-size:12px;font-weight:600;text-decoration:none;border-radius:2px;cursor:pointer;vertical-align:middle;transition:color .12s,background .12s}
+      .rw-fast-accept,.rw-fast-decline{display:inline-block;margin-right:8px;padding:1px 7px;font-family:'Motiva Sans',Arial,sans-serif;font-size:12px;font-weight:600;line-height:1.35;text-decoration:none;border-radius:2px;cursor:pointer;vertical-align:middle;transition:color .12s,background .12s}
       .rw-fast-accept{color:#a6e22e;border:1px solid rgba(166,226,46,.45);background:rgba(166,226,46,.07)}
       .rw-fast-accept:hover{background:rgba(166,226,46,.16);color:#c7ff5e}
       .rw-fast-decline{color:#e2856e;border:1px solid rgba(226,133,110,.45);background:rgba(226,133,110,.07)}
@@ -1305,7 +1305,7 @@
       if (!item.cents && settings.copyUnpriced === false) continue;
       const price = item.cents ? sym() + (item.cents / 100).toFixed(2) : '—';
       const showPrice = settings.copyPrices !== false;
-      lines.push(`${item.count > 1 ? item.count + 'x ' : ''}${item.name}${item.details}${showPrice ? ' — ' + price : ''}`);
+      lines.push(`${item.count > 1 ? item.count + 'x ' : ''}${item.name}${item.details}${showPrice ? ' - ' + price : ''}`);
       totalCents += item.cents * item.count;
       totalItems += item.count;
     }
