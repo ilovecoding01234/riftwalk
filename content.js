@@ -2178,7 +2178,7 @@
       if (!color) return { name: 'Unknown', tier: 'blue' };
       const c = color.toLowerCase().replace(/\s/g, '');
       for (const [hex, data] of Object.entries(RARITY_MAP)) {
-        if (c.includes(hex.replace('#', ''))) return data;
+        if (c.includes(hex.replace('#', ''))) return { ...data };
       }
       return { name: 'Unknown', tier: 'blue' };
     }
